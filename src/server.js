@@ -277,8 +277,8 @@ const languageLine = language && language !== 'English'
   : '';
 
     const modeLine = prompt.startsWith('__own__')
-      ? `Take these lyrics and restyle them ${artistLine} in the ${genre} genre, keep the meaning intact. ${languageLine}\n\nCRITICAL RULES:\n- Output ONLY the lyrics\n- NO notes, NO disclaimers, NO explanations, NO translations, NO commentary\n- NO text before or after the lyrics\n- If you add any notes you have failed the task\n\nSection labels only: [Verse 1], [Chorus] etc.\n\nLyrics to restyle:\n${prompt.replace('__own__', '')}`
-      : `Write original song lyrics ${artistLine} in the ${genre} genre about: ${prompt}. ${languageLine}\n\nCRITICAL RULES:\n- Output ONLY the lyrics\n- NO notes, NO disclaimers, NO explanations, NO translations, NO commentary\n- NO text before or after the lyrics\n- If you add any notes you have failed the task\n\nInclude [Verse 1], [Chorus], [Verse 2] labels only.`;
+      ? `Take these lyrics and restyle them ${artistLine} in the ${genre} genre, keep the meaning intact. ${languageLine}\n\nCRITICAL RULES:\n- Output ONLY the lyrics\n- NO notes, NO disclaimers, NO explanations, NO translations, NO commentary\n- NO text before or after the lyrics\n- If you add any notes, disclaimers or translation reminders you have failed the task\n- Do not add any note about romanization or pinyin\n\nSection labels only: [Verse 1], [Chorus] etc.\n\nLyrics to restyle:\n${prompt.replace('__own__', '')}`
+      : `Write original song lyrics ${artistLine} in the ${genre} genre about: ${prompt}. ${languageLine}\n\nCRITICAL RULES:\n- Output ONLY the lyrics\n- NO notes, NO disclaimers, NO explanations, NO translations, NO commentary\n- NO text before or after the lyrics\n- If you add any notes, disclaimers or translation reminders you have failed the task\n- Do not add any note about romanization or pinyin\n\nInclude [Verse 1], [Chorus], [Verse 2] labels only.`;
 
     const lyrics = await runLyricsJob(modeLine);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

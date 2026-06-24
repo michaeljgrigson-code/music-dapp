@@ -5,11 +5,7 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(cors({ origin: '*', methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json());
 
 const RPC     = process.env.REACT_APP_LIGHTCHAIN_RPC;
@@ -76,7 +72,6 @@ class Gateway {
     this.wallet = wallet;
     this.jwt = null;
   }
-
   async getToken() {
     if (this.jwt && this.jwt.expMs - Date.now() > 30000) return this.jwt.token;
     const ch = await fetch(
@@ -93,7 +88,6 @@ class Gateway {
     this.jwt = { token: v.token, expMs: new Date(v.expiresAt).getTime() };
     return v.token;
   }
-
   async req(path, init = {}, auth = true) {
     const headers = { Accept: 'application/json' };
     if (init.body) headers['Content-Type'] = 'application/json';
@@ -103,12 +97,10 @@ class Gateway {
     if (!r.ok) throw new Error(`${path} ${r.status}: ${t.slice(0, 200)}`);
     return JSON.parse(t);
   }
-
   listModels()       { return this.req('/api/models', {}, false); }
   selectSession(mid) { return this.req('/api/sessions/select', { method: 'POST', body: JSON.stringify({ modelId: mid }) }); }
   prepareSession(b)  { return this.req('/api/sessions/prepare', { method: 'POST', body: JSON.stringify(b) }); }
   uploadBlob(b64)    { return this.req('/api/blobs', { method: 'POST', body: JSON.stringify({ data: b64 }) }); }
-
   async waitForRelayToken(sessionId, timeoutMs = 30000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -126,10 +118,9 @@ class Gateway {
   }
 }
 
-// ─── Music Generation via MiniMax music-2.0 ───────────────────────────────────
-async function generateMusic(lyrics, genre, artist) {
+async function generateMusic(lyrics, genre, artist, language) {
   const style = artist ? `${genre}, ${artist} style` : genre;
-  console.log(`🎵 Starting music generation - Genre: ${genre} | Artist: ${artist || 'None'}`);
+  console.log(`🎵 Starting music generation - Genre: ${genre} | Artist: ${artist || 'None'} | Language: ${language}`);
 
   const formattedLyrics = lyrics.substring(0, 3000);
 
@@ -145,7 +136,6 @@ async function generateMusic(lyrics, genre, artist) {
         model: 'minimax/music-2.0',
         prompt: style,
         lyrics: formattedLyrics,
-        duration: 180,
       }),
     });
 
@@ -157,7 +147,7 @@ async function generateMusic(lyrics, genre, artist) {
 
     generationId = submitData.id;
     if (!generationId) { console.error('❌ No generation ID returned'); return null; }
-    console.log(`🎵 Generation ID: ${generationId} | Status: ${submitData.status}`);
+    console.log(`🎵 Generation ID: ${generationId}`);
   } catch (err) {
     console.error('❌ Music submit crashed:', err.message);
     return null;
@@ -177,24 +167,16 @@ async function generateMusic(lyrics, genre, artist) {
       if (pollData.status === 'completed' || pollData.status === 'success') {
         const audioUrl = pollData.audio_file?.url || pollData.audio_url || pollData.url || null;
         if (audioUrl) { console.log('✅ Music ready →', audioUrl); return { audio_url: audioUrl }; }
-        console.error('❌ Completed but no audio_url:', JSON.stringify(pollData, null, 2));
         return null;
       }
-
-      if (pollData.status === 'failed' || pollData.status === 'error') {
-        console.error('❌ Music generation failed:', pollData);
-        return null;
-      }
-      console.log(`⏳ Still waiting... (${i + 1}/${maxAttempts})`);
+      if (pollData.status === 'failed' || pollData.status === 'error') { return null; }
     } catch (err) {
       console.error(`❌ Poll attempt ${i + 1} crashed:`, err.message);
     }
   }
-  console.error('❌ Music generation timed out after 3 minutes');
   return null;
 }
 
-// ─── Helper: run a LightChain lyrics job ──────────────────────────────────────
 async function runLyricsJob(prompt) {
   const provider = new JsonRpcProvider(RPC);
   const wallet   = new Wallet(process.env.REACT_APP_PRIVATE_KEY, provider);
@@ -228,8 +210,8 @@ async function runLyricsJob(prompt) {
 
   const sessionId  = parseEvent(r1.logs, iface, 'SessionCreated', 'sessionId');
   const relayToken = await gw.waitForRelayToken(sessionId);
-
   const chunks = [];
+
   await new Promise((resolve, reject) => {
     const ws = new (require('ws'))(`${RELAY}?token=${encodeURIComponent(relayToken)}`);
 
@@ -277,18 +259,20 @@ async function runLyricsJob(prompt) {
 
   return chunks.join('');
 }
+
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-// ─── POST /api/lyrics ─────────────────────────────────────────────────────────
+
 app.post('/api/lyrics', async (req, res) => {
-  const { prompt, genre, artist } = req.body;
+  const { prompt, genre, artist, language } = req.body;
   if (!prompt) return res.status(400).json({ error: 'No prompt provided' });
 
   try {
-    const artistLine = artist ? `in the style of ${artist}` : '';
+    const artistLine   = artist ? `in the style of ${artist}` : '';
+    const languageLine = language && language !== 'English' ? `Write the lyrics in ${language}.` : '';
 
     const modeLine = prompt.startsWith('__own__')
-      ? `Take these lyrics and restyle them ${artistLine} in the ${genre} genre, keep the meaning intact. Return ONLY the lyrics with section labels like [Verse 1], [Chorus] etc. No intro text, no notes, no explanations, just the lyrics:\n\n${prompt.replace('__own__', '')}`
-      : `Write original song lyrics ${artistLine} in the ${genre} genre about: ${prompt}. Include a verse, chorus, and another verse. Return ONLY the lyrics with section labels like [Verse 1], [Chorus] etc. No intro sentence, no notes, no explanations at the end, just the raw lyrics.`;
+      ? `Take these lyrics and restyle them ${artistLine} in the ${genre} genre, keep the meaning intact. ${languageLine} Return ONLY the lyrics with section labels like [Verse 1], [Chorus] etc. No intro text, no notes, no explanations, just the lyrics:\n\n${prompt.replace('__own__', '')}`
+      : `Write original song lyrics ${artistLine} in the ${genre} genre about: ${prompt}. ${languageLine} Include a verse, chorus, and another verse. Return ONLY the lyrics with section labels like [Verse 1], [Chorus] etc. No intro sentence, no notes, no explanations at the end, just the raw lyrics.`;
 
     const lyrics = await runLyricsJob(modeLine);
     res.json({ lyrics });
@@ -298,11 +282,10 @@ app.post('/api/lyrics', async (req, res) => {
   }
 });
 
-// ─── POST /api/music ──────────────────────────────────────────────────────────
 app.post('/api/music', async (req, res) => {
-  const { lyrics, genre, artist, txHash } = req.body;
+  const { lyrics, genre, artist, language, txHash } = req.body;
   if (!lyrics) return res.status(400).json({ error: 'No lyrics provided' });
-  if (!txHash) return res.status(402).json({ error: 'Payment required — no txHash provided' });
+  if (!txHash) return res.status(402).json({ error: 'Payment required' });
 
   try {
     const provider = new JsonRpcProvider(RPC);
@@ -311,7 +294,7 @@ app.post('/api/music', async (req, res) => {
       return res.status(402).json({ error: 'Payment transaction not confirmed on chain' });
     }
 
-    const music = await generateMusic(lyrics, genre, artist);
+    const music = await generateMusic(lyrics, genre, artist, language);
     if (!music) return res.status(500).json({ error: 'Music generation failed' });
 
     res.json({ music });
@@ -321,9 +304,8 @@ app.post('/api/music', async (req, res) => {
   }
 });
 
-// ─── Fallback /api/generate ───────────────────────────────────────────────────
 app.post('/api/generate', async (req, res) => {
-  const { prompt, genre, artist } = req.body;
+  const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'No prompt provided' });
   try {
     const lyrics = await runLyricsJob(prompt);

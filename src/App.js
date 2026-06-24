@@ -12,17 +12,24 @@ const genres = [
   'Punk', 'Folk', 'Classical', 'Reggae',
 ];
 
+const languages = [
+  'English', 'Spanish', 'French', 'German', 'Italian',
+  'Portuguese', 'Chinese', 'Japanese', 'Korean', 'Arabic',
+  'Hindi', 'Russian', 'Dutch', 'Swedish', 'Polish',
+];
+
 export default function App() {
-  const [prompt, setPrompt]     = useState('');
-  const [genre, setGenre]       = useState('Rock');
-  const [artist, setArtist]     = useState('');
-  const [mode, setMode]         = useState('topic');
-  const [step, setStep]         = useState('idle');
-  const [lyrics, setLyrics]     = useState('');
-  const [music, setMusic]       = useState(null);
-  const [status, setStatus]     = useState('');
-  const [copied, setCopied]     = useState(false);
-  const [payError, setPayError] = useState('');
+  const [prompt, setPrompt]       = useState('');
+  const [genres_selected, setGenresSelected] = useState(['Rock']);
+  const [artist, setArtist]       = useState('');
+  const [language, setLanguage]   = useState('English');
+  const [mode, setMode]           = useState('topic');
+  const [step, setStep]           = useState('idle');
+  const [lyrics, setLyrics]       = useState('');
+  const [music, setMusic]         = useState(null);
+  const [status, setStatus]       = useState('');
+  const [copied, setCopied]       = useState(false);
+  const [payError, setPayError]   = useState('');
   const [walletAddress, setWalletAddress] = useState(null);
 
   // Warm up server on page load
@@ -55,6 +62,17 @@ export default function App() {
     setPayError('');
   }, [lyrics]);
 
+  const toggleGenre = (g) => {
+    setGenresSelected(prev => {
+      if (prev.includes(g)) {
+        if (prev.length === 1) return prev; // must keep at least one
+        return prev.filter(x => x !== g);
+      }
+      if (prev.length >= 3) return prev; // max 3
+      return [...prev, g];
+    });
+  };
+
   const handleGenerateLyrics = async () => {
     if (!prompt) return;
     setStep('generatingLyrics');
@@ -68,7 +86,7 @@ export default function App() {
       const res  = await fetch(`${SERVER_URL}/api/lyrics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptPayload, genre, artist }),
+        body: JSON.stringify({ prompt: promptPayload, genre: genres_selected.join(', '), artist, language }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -120,7 +138,7 @@ export default function App() {
       const res  = await fetch(`${SERVER_URL}/api/music`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lyrics: lyricsText, genre, artist, txHash }),
+        body: JSON.stringify({ lyrics: lyricsText, genre: genres_selected.join(', '), artist, language, txHash }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -219,6 +237,12 @@ export default function App() {
       letterSpacing: '2px',
       textTransform: 'uppercase',
     },
+    sublabel: {
+      color: '#555',
+      fontSize: '0.75rem',
+      marginBottom: '0.75rem',
+      display: 'block',
+    },
     textarea: {
       width: '100%',
       background: 'rgba(0,0,0,0.4)',
@@ -251,13 +275,24 @@ export default function App() {
       padding: '4px',
       gap: '4px',
     },
-    genreWrap: { display: 'flex', flexWrap: 'wrap', gap: '0.6rem' },
-    genreBtn: (active) => ({
+    btnWrap: { display: 'flex', flexWrap: 'wrap', gap: '0.6rem' },
+    genreBtn: (active, maxed) => ({
+      padding: '0.4rem 1rem',
+      borderRadius: '999px',
+      cursor: maxed && !active ? 'not-allowed' : 'pointer',
+      background: active ? 'linear-gradient(135deg,#ff4400,#aa00ff)' : 'transparent',
+      border: active ? '1px solid transparent' : '1px solid rgba(255,68,0,0.3)',
+      color: active ? 'white' : maxed ? '#444' : '#888',
+      fontWeight: active ? 'bold' : 'normal',
+      fontSize: '0.85rem',
+      opacity: maxed && !active ? 0.4 : 1,
+    }),
+    langBtn: (active) => ({
       padding: '0.4rem 1rem',
       borderRadius: '999px',
       cursor: 'pointer',
-      background: active ? 'linear-gradient(135deg,#ff4400,#aa00ff)' : 'transparent',
-      border: active ? '1px solid transparent' : '1px solid rgba(255,68,0,0.3)',
+      background: active ? 'linear-gradient(135deg,#0066ff,#aa00ff)' : 'transparent',
+      border: active ? '1px solid transparent' : '1px solid rgba(0,100,255,0.3)',
       color: active ? 'white' : '#888',
       fontWeight: active ? 'bold' : 'normal',
       fontSize: '0.85rem',
@@ -290,6 +325,7 @@ export default function App() {
   const showPaywall  = step === 'lyrics';
   const showPaying   = step === 'paying' || step === 'generatingMusic';
   const showMusic    = step === 'done' && music?.audio_url;
+  const maxGenres    = genres_selected.length >= 3;
 
   return (
     <div style={S.app}>
@@ -370,12 +406,33 @@ export default function App() {
         />
       </div>
 
-      {/* Genre */}
+      {/* Genre — multi select up to 3 */}
       <div style={S.card}>
-        <label style={S.label}>Pick a genre</label>
-        <div style={S.genreWrap}>
+        <label style={S.label}>Pick up to 3 genres</label>
+        <span style={S.sublabel}>
+          {genres_selected.length === 3
+            ? '✅ 3 selected — deselect one to change'
+            : `${genres_selected.length} selected`}
+        </span>
+        <div style={S.btnWrap}>
           {genres.map(g => (
-            <button key={g} onClick={() => setGenre(g)} style={S.genreBtn(genre === g)}>{g}</button>
+            <button
+              key={g}
+              onClick={() => toggleGenre(g)}
+              style={S.genreBtn(genres_selected.includes(g), maxGenres)}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Language */}
+      <div style={S.card}>
+        <label style={S.label}>Pick a language</label>
+        <div style={S.btnWrap}>
+          {languages.map(l => (
+            <button key={l} onClick={() => setLanguage(l)} style={S.langBtn(language === l)}>{l}</button>
           ))}
         </div>
       </div>

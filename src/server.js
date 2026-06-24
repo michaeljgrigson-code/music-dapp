@@ -276,7 +276,8 @@ app.post('/api/lyrics', async (req, res) => {
       : `Write original song lyrics ${artistLine} in the ${genre} genre about: ${prompt}. ${languageLine}\n\nCRITICAL RULES:\n- Output ONLY the lyrics\n- NO notes, NO disclaimers, NO explanations, NO translations, NO commentary\n- NO text before or after the lyrics\n- If you add any notes you have failed the task\n\nInclude [Verse 1], [Chorus], [Verse 2] labels only.`;
 
     const lyrics = await runLyricsJob(modeLine);
-    res.json({ lyrics });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+res.end(JSON.stringify({ lyrics }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

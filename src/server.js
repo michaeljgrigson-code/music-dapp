@@ -119,7 +119,8 @@ class Gateway {
 }
 
 async function generateMusic(lyrics, genre, artist, language) {
-  const style = artist ? `${genre}, ${artist} style` : genre;
+  const langStyle = language && language !== 'English' ? `, sung in ${language}` : '';
+const style = artist ? `${genre}, ${artist} style${langStyle}` : `${genre}${langStyle}`;
   console.log(`🎵 Starting music generation - Genre: ${genre} | Artist: ${artist || 'None'} | Language: ${language}`);
 
   const formattedLyrics = lyrics.substring(0, 3000);

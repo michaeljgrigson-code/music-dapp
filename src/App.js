@@ -61,7 +61,7 @@ export default function App() {
 
     try {
       const promptPayload = mode === 'own' ? `__own__${prompt}` : prompt;
-      const res  = await fetch('http://localhost:3001/api/lyrics', {
+      const res  = await fetch('https://music-dapp.onrender.com/api/lyrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: promptPayload, genre, artist }),
@@ -115,7 +115,7 @@ export default function App() {
     setStatus('🎵 Generating your song — this takes 1-3 minutes...');
 
     try {
-      const res  = await fetch('http://localhost:3001/api/music', {
+      const res  = await fetch('https://music-dapp.onrender.com/api/music', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lyrics: lyricsText, genre, artist, txHash }),

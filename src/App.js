@@ -27,6 +27,8 @@ const modes = [
   { id: 'haiku', label: '🌸 Haiku' },
 ];
 
+const isMobile = () => window.innerWidth < 768;
+
 export default function App() {
   const [prompt, setPrompt]         = useState('');
   const [genresSelected, setGenresSelected] = useState(['Rock']);
@@ -43,6 +45,13 @@ export default function App() {
   const [view, setView]             = useState('home');
   const [sharedSong, setSharedSong] = useState(null);
   const [loadingShared, setLoadingShared] = useState(false);
+  const [mobile, setMobile]         = useState(isMobile());
+
+  useEffect(() => {
+    const handleResize = () => setMobile(isMobile());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetch(`${SERVER_URL}/api/health`).catch(() => {});
@@ -185,7 +194,6 @@ export default function App() {
     });
   };
 
-
   const handleDownload = async (audioUrl) => {
     const url = audioUrl || music?.audio_url;
     if (!url) return;
@@ -208,28 +216,44 @@ export default function App() {
         radial-gradient(ellipse at 50% 80%, #1a0a2a 0%, transparent 50%),
         #0a0a0a
       `,
-      color: 'white', padding: '2rem 2rem 2rem 200px', fontFamily: 'inherit',
+      color: 'white',
+      padding: mobile ? '0 0 2rem 0' : '2rem 2rem 2rem 200px',
+      fontFamily: 'inherit',
     },
     sidebar: {
       position: 'fixed', left: 0, top: 0, height: '100vh', width: '180px',
       background: 'rgba(0,0,0,0.7)', borderRight: '1px solid rgba(51,255,102,0.2)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      display: mobile ? 'none' : 'flex',
+      flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', gap: '1rem', padding: '1.5rem 1rem', zIndex: 100,
     },
+    mobileHeader: {
+      display: mobile ? 'flex' : 'none',
+      alignItems: 'center', gap: '0.75rem',
+      padding: '0.75rem 1rem',
+      background: 'rgba(0,0,0,0.7)',
+      borderBottom: '1px solid rgba(51,255,102,0.2)',
+      position: 'sticky', top: 0, zIndex: 100,
+    },
+    mainContent: {
+      padding: mobile ? '1.25rem 1rem' : '0',
+    },
     title: {
-      textAlign: 'center', fontSize: '3rem', fontWeight: 900, letterSpacing: '4px',
+      textAlign: 'center', fontSize: mobile ? '2rem' : '3rem',
+      fontWeight: 900, letterSpacing: mobile ? '2px' : '4px',
       textTransform: 'uppercase',
       background: 'linear-gradient(135deg,#ff4400,#ff0088,#aa00ff,#ff4400)',
-      WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '0.5rem',
+      WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+      marginBottom: '0.5rem', marginTop: mobile ? '1rem' : '0',
     },
     sub: {
       textAlign: 'center', color: '#666', letterSpacing: '6px',
-      textTransform: 'uppercase', fontSize: '0.8rem', marginBottom: '2.5rem',
+      textTransform: 'uppercase', fontSize: '0.8rem', marginBottom: '2rem',
     },
     card: {
       maxWidth: '600px', margin: '0 auto 1.5rem',
       background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,68,0,0.2)',
-      borderRadius: '12px', padding: '1.25rem',
+      borderRadius: '12px', padding: mobile ? '1rem' : '1.25rem',
     },
     label: {
       display: 'block', color: '#aaa', marginBottom: '0.5rem',
@@ -248,25 +272,25 @@ export default function App() {
     },
     btnWrap: { display: 'flex', flexWrap: 'wrap', gap: '0.6rem' },
     modeBtn: (active) => ({
-      padding: '0.6rem 1.2rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold',
+      padding: '0.6rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold',
       background: active ? 'linear-gradient(135deg,#ff4400,#aa00ff)' : 'rgba(0,0,0,0.4)',
       border: active ? '1px solid transparent' : '1px solid rgba(255,68,0,0.3)',
-      color: active ? 'white' : '#888', fontSize: '0.9rem',
+      color: active ? 'white' : '#888', fontSize: mobile ? '0.82rem' : '0.9rem',
     }),
     genreBtn: (active, maxed) => ({
-      padding: '0.4rem 1rem', borderRadius: '999px',
+      padding: '0.4rem 0.85rem', borderRadius: '999px',
       cursor: maxed && !active ? 'not-allowed' : 'pointer',
       background: active ? 'linear-gradient(135deg,#ff4400,#aa00ff)' : 'transparent',
       border: active ? '1px solid transparent' : '1px solid rgba(255,68,0,0.3)',
       color: active ? 'white' : maxed ? '#444' : '#888',
-      fontWeight: active ? 'bold' : 'normal', fontSize: '0.85rem',
+      fontWeight: active ? 'bold' : 'normal', fontSize: '0.82rem',
       opacity: maxed && !active ? 0.4 : 1,
     }),
     langBtn: (active) => ({
-      padding: '0.4rem 1rem', borderRadius: '999px', cursor: 'pointer',
+      padding: '0.4rem 0.85rem', borderRadius: '999px', cursor: 'pointer',
       background: active ? 'linear-gradient(135deg,#0066ff,#aa00ff)' : 'transparent',
       border: active ? '1px solid transparent' : '1px solid rgba(0,100,255,0.3)',
-      color: active ? 'white' : '#888', fontWeight: active ? 'bold' : 'normal', fontSize: '0.85rem',
+      color: active ? 'white' : '#888', fontWeight: active ? 'bold' : 'normal', fontSize: '0.82rem',
     }),
     primaryBtn: (disabled) => ({
       width: '100%',
@@ -329,54 +353,70 @@ export default function App() {
     </div>
   );
 
+  const MobileHeader = () => (
+    <div style={S.mobileHeader}>
+      <img src={frankenLogo} alt="FrankenLabs"
+        style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1px solid rgba(51,255,102,0.4)' }} />
+      <div>
+        <div style={{ fontSize: '0.7rem', fontWeight: 900, letterSpacing: '2px',
+          color: '#33ff66', textTransform: 'uppercase', lineHeight: 1 }}>FRANKENLABS</div>
+        <div style={{ fontSize: '0.55rem', color: '#555', letterSpacing: '2px',
+          textTransform: 'uppercase' }}>PRESENTS</div>
+      </div>
+    </div>
+  );
+
   // ─── Shared song view ────────────────────────────────────────────────────
   if (view === 'shared') {
     return (
       <div style={S.app}>
         <Sidebar />
-        <h1 style={S.title}>🎵 LyricsAI</h1>
-        <p style={S.sub}>Powered by LightChain</p>
+        <MobileHeader />
+        <div style={S.mainContent}>
+          <h1 style={S.title}>🎵 LyricsAI</h1>
+          <p style={S.sub}>Powered by LightChain</p>
 
-        {loadingShared && (
-          <div style={{ textAlign: 'center', color: '#aa00ff', marginTop: '3rem' }}>⚡ Loading song...</div>
-        )}
+          {loadingShared && (
+            <div style={{ textAlign: 'center', color: '#aa00ff', marginTop: '3rem' }}>⚡ Loading song...</div>
+          )}
 
-        {sharedSong && (
-          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <div style={{ ...S.card, marginBottom: '1.5rem' }}>
-              <div style={{ color: '#aaa', fontSize: '0.8rem', letterSpacing: '2px',
-                textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                {sharedSong.genre} · {sharedSong.language}
-                {sharedSong.artist && ` · ${sharedSong.artist} style`}
+          {sharedSong && (
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ ...S.card, marginBottom: '1.5rem' }}>
+                <div style={{ color: '#aaa', fontSize: '0.8rem', letterSpacing: '2px',
+                  textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                  {sharedSong.genre} · {sharedSong.language}
+                  {sharedSong.artist && ` · ${sharedSong.artist} style`}
+                </div>
+                <pre style={{ whiteSpace: 'pre-wrap', color: '#e5e7eb', lineHeight: '1.8', margin: 0 }}>
+                  {sharedSong.lyrics}
+                </pre>
               </div>
-              <pre style={{ whiteSpace: 'pre-wrap', color: '#e5e7eb', lineHeight: '1.8', margin: 0 }}>
-                {sharedSong.lyrics}
-              </pre>
-            </div>
-            {sharedSong.audio_url && (
-              <div style={{ maxWidth: '600px', margin: '0 auto', background: 'rgba(255,68,0,0.05)',
-                borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
-                <div style={{ color: '#aa00ff', fontWeight: 'bold', marginBottom: '1rem',
-                  letterSpacing: '2px', textTransform: 'uppercase' }}>🎸 Listen</div>
-                <audio controls style={{ width: '100%', marginBottom: '1.25rem' }}>
-                  <source src={sharedSong.audio_url} type="audio/mpeg" />
-                </audio>
-                <button onClick={() => handleDownload(sharedSong.audio_url)} style={S.greenBtn}>
-                  ⬇️ Download Song (MP3)
+              {sharedSong.audio_url && (
+                <div style={{ maxWidth: '600px', margin: '0 auto', background: 'rgba(255,68,0,0.05)',
+                  borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
+                  <div style={{ color: '#aa00ff', fontWeight: 'bold', marginBottom: '1rem',
+                    letterSpacing: '2px', textTransform: 'uppercase' }}>🎸 Listen</div>
+                  <audio controls style={{ width: '100%', marginBottom: '1.25rem' }}>
+                    <source src={sharedSong.audio_url} type="audio/mpeg" />
+                  </audio>
+                  <button onClick={() => handleDownload(sharedSong.audio_url)} style={S.greenBtn}>
+                    ⬇️ Download Song (MP3)
+                  </button>
+                  <a href="https://lighttunes.win" target="_blank" rel="noopener noreferrer" style={S.purpleBtn}>
+                    🌍 Publish on LightTunes
+                  </a>
+                </div>
+              )}
+              <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+                <button onClick={() => { setView('home'); window.history.pushState({}, '', '/'); }}
+                  style={S.outlineBtn}>
+                  🎵 Create your own song
                 </button>
-                <a href="https://lighttunes.win" target="_blank" rel="noopener noreferrer" style={S.purpleBtn}>
-                  🌍 Publish on LightTunes
-                </a>
               </div>
-            )}
-            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-              <button onClick={() => { setView('home'); window.history.pushState({}, '', '/'); }}
-                style={S.outlineBtn}>
-                🎵 Create your own song
-              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   }
@@ -385,211 +425,212 @@ export default function App() {
   return (
     <div style={S.app}>
       <Sidebar />
+      <MobileHeader />
 
-      {['♪','♫','♩','♬','♭'].map((n, i) => (
+      {!mobile && ['♪','♫','♩','♬','♭'].map((n, i) => (
         <div key={i} style={{ position: 'fixed', fontSize: '1.5rem', opacity: 0.08,
           top: `${15 + i * 15}%`, left: `${5 + i * 18}%`,
           color: '#ff4400', pointerEvents: 'none', userSelect: 'none' }}>{n}</div>
       ))}
 
-      <h1 style={S.title}>🎵 LyricsAI</h1>
-      <p style={S.sub}>Powered by LightChain</p>
+      <div style={S.mainContent}>
+        <h1 style={S.title}>🎵 LyricsAI</h1>
+        <p style={S.sub}>Powered by LightChain</p>
 
-      <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={connectWallet} style={{
-          background: walletAddress ? 'rgba(0,200,100,0.15)' : 'linear-gradient(135deg,#ff4400,#aa00ff)',
-          border: walletAddress ? '1px solid rgba(0,200,100,0.4)' : 'none',
-          color: walletAddress ? '#00cc66' : 'white',
-          borderRadius: '8px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold',
-        }}>
-          {walletAddress ? `✅ ${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}` : '🔌 Connect Wallet'}
-        </button>
-      </div>
-
-      <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem' }}>
-        <label style={S.label}>What do you want to create?</label>
-        <div style={S.btnWrap}>
-          {modes.map(m => (
-            <button key={m.id} onClick={() => { setMode(m.id); setPrompt(''); }}
-              style={S.modeBtn(mode === m.id)}>
-              {m.label}
-            </button>
-          ))}
+        <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={connectWallet} style={{
+            background: walletAddress ? 'rgba(0,200,100,0.15)' : 'linear-gradient(135deg,#ff4400,#aa00ff)',
+            border: walletAddress ? '1px solid rgba(0,200,100,0.4)' : 'none',
+            color: walletAddress ? '#00cc66' : 'white',
+            borderRadius: '8px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold',
+          }}>
+            {walletAddress ? `✅ ${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}` : '🔌 Connect Wallet'}
+          </button>
         </div>
-      </div>
 
-      <div style={S.card}>
-        <label style={S.label}>
-          {mode === 'topic' && "What's your song about?"}
-          {mode === 'own' && 'Paste your lyrics'}
-          {mode === 'poem' && "What's your poem about?"}
-          {mode === 'haiku' && "What's your haiku about?"}
-        </label>
-        {mode === 'haiku' && (
-          <span style={S.sublabel}>A haiku is 3 lines: 5 syllables, 7 syllables, 5 syllables</span>
-        )}
-        <textarea
-          style={{ ...S.textarea, height: mode === 'own' ? '200px' : mode === 'haiku' ? '80px' : '120px' }}
-          placeholder={
-            mode === 'topic' ? 'e.g. a trucker who misses home, driving through Nevada at 3am...' :
-            mode === 'own' ? "Paste your lyrics here and we'll style them for you..." :
-            mode === 'poem' ? 'e.g. the ocean at night, the feeling of being lost...' :
-            'e.g. cherry blossoms falling, a quiet morning...'
-          }
-          value={prompt}
-          onChange={e => setPrompt(e.target.value)}
-        />
-        {mode === 'topic' && (
-          <div style={{ marginTop: '0.75rem', padding: '0.75rem',
-            background: 'rgba(255,68,0,0.05)', borderRadius: '8px',
-            border: '1px solid rgba(255,68,0,0.15)', fontSize: '0.78rem', color: '#666', lineHeight: '1.6' }}>
-            💡 <span style={{ color: '#888' }}>Pro tip — control each section's style using brackets:</span>
-            <br/>
-            <span style={{ color: '#555', fontStyle: 'italic' }}>
-              A song about heaven and earth<br/>
-              [Verse 1: monastery chanting, heavenly feel]<br/>
-              [Chorus: electronic, both worlds colliding]<br/>
-              [Bridge: trap beat, the breaking point]
-            </span>
-          </div>
-        )}
-      </div>
-
-      {mode !== 'haiku' && (
-        <div style={S.card}>
-          <label style={S.label}>{isPoemOrHaiku ? 'Pick a style' : 'Pick up to 3 genres'}</label>
-          <span style={S.sublabel}>
-            {mode === 'poem' ? 'Influences the tone and rhythm of the poem' :
-              genresSelected.length === 3 ? '✅ 3 selected — deselect one to change' :
-              `${genresSelected.length} selected`}
-          </span>
+        <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem' }}>
+          <label style={S.label}>What do you want to create?</label>
           <div style={S.btnWrap}>
-            {genres.map(g => (
-              <button key={g} onClick={() => toggleGenre(g)} style={S.genreBtn(genresSelected.includes(g), maxGenres)}>
-                {g}
+            {modes.map(m => (
+              <button key={m.id} onClick={() => { setMode(m.id); setPrompt(''); }}
+                style={S.modeBtn(mode === m.id)}>
+                {m.label}
               </button>
             ))}
           </div>
         </div>
-      )}
 
-      <div style={S.card}>
-        <label style={S.label}>Pick a language</label>
-        <div style={S.btnWrap}>
-          {languages.map(l => (
-            <button key={l} onClick={() => setLanguage(l)} style={S.langBtn(language === l)}>{l}</button>
-          ))}
-        </div>
-      </div>
-
-      {!isPoemOrHaiku && (
         <div style={S.card}>
-          <label style={S.label}>Artist or band style <span style={{ color: '#555' }}>— optional</span></label>
-          <input type="text" style={S.input}
-            placeholder="e.g. Korn, Harry Styles, Johnny Cash, Billie Eilish..."
-            value={artist} onChange={e => setArtist(e.target.value)} />
-        </div>
-      )}
-
-      {status && (
-        <div style={{ maxWidth: '600px', margin: '-1rem auto 1rem', color: '#aa00ff', fontSize: '0.85rem', textAlign: 'center' }}>
-          ⚡ {status}
-        </div>
-      )}
-
-      <div style={{ maxWidth: '600px', margin: '0 auto 2rem' }}>
-        <button onClick={handleGenerate} disabled={isGenerating || !prompt} style={S.primaryBtn(isGenerating || !prompt)}>
-          {generateLabel()}
-        </button>
-      </div>
-
-      {showLyrics && (
-        <div style={{ maxWidth: '600px', margin: '0 auto 1rem', background: 'rgba(255,68,0,0.05)',
-          borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div style={{ background: 'linear-gradient(135deg,#ff4400,#aa00ff)', WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent', fontWeight: 'bold', fontSize: '1.1rem',
-              letterSpacing: '2px', textTransform: 'uppercase' }}>
-              {outputLabel()}
+          <label style={S.label}>
+            {mode === 'topic' && "What's your song about?"}
+            {mode === 'own' && 'Paste your lyrics'}
+            {mode === 'poem' && "What's your poem about?"}
+            {mode === 'haiku' && "What's your haiku about?"}
+          </label>
+          {mode === 'haiku' && (
+            <span style={S.sublabel}>A haiku is 3 lines: 5 syllables, 7 syllables, 5 syllables</span>
+          )}
+          <textarea
+            style={{ ...S.textarea, height: mode === 'own' ? '200px' : mode === 'haiku' ? '80px' : '120px' }}
+            placeholder={
+              mode === 'topic' ? 'e.g. a trucker who misses home, driving through Nevada at 3am...' :
+              mode === 'own' ? "Paste your lyrics here and we'll style them for you..." :
+              mode === 'poem' ? 'e.g. the ocean at night, the feeling of being lost...' :
+              'e.g. cherry blossoms falling, a quiet morning...'
+            }
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+          />
+          {mode === 'topic' && (
+            <div style={{ marginTop: '0.75rem', padding: '0.75rem',
+              background: 'rgba(255,68,0,0.05)', borderRadius: '8px',
+              border: '1px solid rgba(255,68,0,0.15)', fontSize: '0.78rem', color: '#666', lineHeight: '1.6' }}>
+              💡 <span style={{ color: '#888' }}>Pro tip — control each section's style using brackets:</span>
+              <br/>
+              <span style={{ color: '#555', fontStyle: 'italic' }}>
+                A song about heaven and earth<br/>
+                [Verse 1: monastery chanting, heavenly feel]<br/>
+                [Chorus: electronic, both worlds colliding]<br/>
+                [Bridge: trap beat, the breaking point]
+              </span>
             </div>
-            <button onClick={handleCopy} style={{
-              background: copied ? 'rgba(0,200,100,0.15)' : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${copied ? 'rgba(0,200,100,0.4)' : 'rgba(255,68,0,0.3)'}`,
-              color: copied ? '#00cc66' : '#aaa', borderRadius: '6px', padding: '0.4rem 0.9rem',
-              fontSize: '0.8rem', cursor: 'pointer', letterSpacing: '1px',
-            }}>
-              {copied ? '✅ Copied!' : '📋 Copy'}
+          )}
+        </div>
+
+        {mode !== 'haiku' && (
+          <div style={S.card}>
+            <label style={S.label}>{isPoemOrHaiku ? 'Pick a style' : 'Pick up to 3 genres'}</label>
+            <span style={S.sublabel}>
+              {mode === 'poem' ? 'Influences the tone and rhythm of the poem' :
+                genresSelected.length === 3 ? '✅ 3 selected — deselect one to change' :
+                `${genresSelected.length} selected`}
+            </span>
+            <div style={S.btnWrap}>
+              {genres.map(g => (
+                <button key={g} onClick={() => toggleGenre(g)} style={S.genreBtn(genresSelected.includes(g), maxGenres)}>
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={S.card}>
+          <label style={S.label}>Pick a language</label>
+          <div style={S.btnWrap}>
+            {languages.map(l => (
+              <button key={l} onClick={() => setLanguage(l)} style={S.langBtn(language === l)}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {!isPoemOrHaiku && (
+          <div style={S.card}>
+            <label style={S.label}>Artist or band style <span style={{ color: '#555' }}>— optional</span></label>
+            <input type="text" style={S.input}
+              placeholder="e.g. Korn, Harry Styles, Johnny Cash, Billie Eilish..."
+              value={artist} onChange={e => setArtist(e.target.value)} />
+          </div>
+        )}
+
+        {status && (
+          <div style={{ maxWidth: '600px', margin: '-1rem auto 1rem', color: '#aa00ff', fontSize: '0.85rem', textAlign: 'center' }}>
+            ⚡ {status}
+          </div>
+        )}
+
+        <div style={{ maxWidth: '600px', margin: '0 auto 2rem' }}>
+          <button onClick={handleGenerate} disabled={isGenerating || !prompt} style={S.primaryBtn(isGenerating || !prompt)}>
+            {generateLabel()}
+          </button>
+        </div>
+
+        {showLyrics && (
+          <div style={{ maxWidth: '600px', margin: '0 auto 1rem', background: 'rgba(255,68,0,0.05)',
+            borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ background: 'linear-gradient(135deg,#ff4400,#aa00ff)', WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent', fontWeight: 'bold', fontSize: '1.1rem',
+                letterSpacing: '2px', textTransform: 'uppercase' }}>
+                {outputLabel()}
+              </div>
+              <button onClick={handleCopy} style={{
+                background: copied ? 'rgba(0,200,100,0.15)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${copied ? 'rgba(0,200,100,0.4)' : 'rgba(255,68,0,0.3)'}`,
+                color: copied ? '#00cc66' : '#aaa', borderRadius: '6px', padding: '0.4rem 0.9rem',
+                fontSize: '0.8rem', cursor: 'pointer', letterSpacing: '1px',
+              }}>
+                {copied ? '✅ Copied!' : '📋 Copy'}
+              </button>
+            </div>
+            <pre style={{ whiteSpace: 'pre-wrap', color: '#e5e7eb', lineHeight: '1.8', margin: 0 }}>
+              {lyrics}
+            </pre>
+          </div>
+        )}
+
+        {showLyrics && step === 'lyrics' && (
+          <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', padding: '0.9rem 1.25rem',
+            background: 'rgba(255,200,0,0.06)', border: '1px solid rgba(255,200,0,0.25)',
+            borderRadius: '10px', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>✏️</span>
+            <p style={{ margin: 0, color: '#bba', fontSize: '0.88rem', lineHeight: '1.6' }}>
+              <strong style={{ color: '#ffcc44' }}>Before you continue —</strong> please double-check your lyrics.
+              If you'd like to make changes, copy them into the <strong style={{ color: '#ffcc44' }}>✏️ My own lyrics</strong> mode above and edit before generating your song.
+            </p>
+          </div>
+        )}
+
+        {showPaywall && (
+          <div style={{ maxWidth: '600px', margin: '0 auto 2rem', background: 'rgba(0,0,0,0.35)',
+            borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(170,0,255,0.3)', textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎵</div>
+            <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.4rem' }}>
+              Generate &amp; Download Your Song
+            </div>
+            <div style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+              Pay <span style={{ color: '#ff4400', fontWeight: 'bold' }}>{DOWNLOAD_PRICE} LCAI</span> to generate the music and unlock the download.
+            </div>
+            {!walletAddress && (
+              <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                👆 Connect your wallet above first
+              </div>
+            )}
+            <button onClick={handlePay} disabled={!walletAddress} style={S.primaryBtn(!walletAddress)}>
+              {walletAddress ? `💎 Pay ${DOWNLOAD_PRICE} LCAI & Generate Song` : '🔒 Connect Wallet to Continue'}
             </button>
+            {payError && (
+              <div style={{ color: '#ff4444', fontSize: '0.85rem', marginTop: '0.75rem' }}>❌ {payError}</div>
+            )}
           </div>
-          <pre style={{ whiteSpace: 'pre-wrap', color: '#e5e7eb', lineHeight: '1.8', margin: 0 }}>
-            {lyrics}
-          </pre>
-        </div>
-      )}
+        )}
 
-      {/* Review note — shown after lyrics are generated, before paying */}
-      {showLyrics && step === 'lyrics' && (
-        <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', padding: '0.9rem 1.25rem',
-          background: 'rgba(255,200,0,0.06)', border: '1px solid rgba(255,200,0,0.25)',
-          borderRadius: '10px', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-          <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>✏️</span>
-          <p style={{ margin: 0, color: '#bba', fontSize: '0.88rem', lineHeight: '1.6' }}>
-            <strong style={{ color: '#ffcc44' }}>Before you continue —</strong> please double-check your lyrics.
-            If you'd like to make changes, copy them into the <strong style={{ color: '#ffcc44' }}>✏️ My own lyrics</strong> mode above and edit before generating your song.
-          </p>
-        </div>
-      )}
+        {showPaying && (
+          <div style={{ maxWidth: '600px', margin: '0 auto 2rem', textAlign: 'center', color: '#aa00ff', fontSize: '0.95rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎸</div>
+            {status || 'Processing payment...'}
+          </div>
+        )}
 
-      {showPaywall && (
-        <div style={{ maxWidth: '600px', margin: '0 auto 2rem', background: 'rgba(0,0,0,0.35)',
-          borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(170,0,255,0.3)', textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎵</div>
-          <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.4rem' }}>
-            Generate &amp; Download Your Song
-          </div>
-          <div style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-            Pay <span style={{ color: '#ff4400', fontWeight: 'bold' }}>{DOWNLOAD_PRICE} LCAI</span> to generate the music and unlock the download.
-          </div>
-          {!walletAddress && (
-            <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              👆 Connect your wallet above first
+        {showMusic && (
+          <div style={{ maxWidth: '600px', margin: '0 auto', background: 'rgba(255,68,0,0.05)',
+            borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
+            <div style={{ color: '#aa00ff', fontWeight: 'bold', marginBottom: '1rem',
+              letterSpacing: '2px', textTransform: 'uppercase', fontSize: '1.1rem' }}>
+              🎸 Your Song
             </div>
-          )}
-          <button onClick={handlePay} disabled={!walletAddress} style={S.primaryBtn(!walletAddress)}>
-            {walletAddress ? `💎 Pay ${DOWNLOAD_PRICE} LCAI & Generate Song` : '🔒 Connect Wallet to Continue'}
-          </button>
-          {payError && (
-            <div style={{ color: '#ff4444', fontSize: '0.85rem', marginTop: '0.75rem' }}>❌ {payError}</div>
-          )}
-        </div>
-      )}
-
-      {showPaying && (
-        <div style={{ maxWidth: '600px', margin: '0 auto 2rem', textAlign: 'center', color: '#aa00ff', fontSize: '0.95rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎸</div>
-          {status || 'Processing payment...'}
-        </div>
-      )}
-
-      {showMusic && (
-        <div style={{ maxWidth: '600px', margin: '0 auto', background: 'rgba(255,68,0,0.05)',
-          borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
-          <div style={{ color: '#aa00ff', fontWeight: 'bold', marginBottom: '1rem',
-            letterSpacing: '2px', textTransform: 'uppercase', fontSize: '1.1rem' }}>
-            🎸 Your Song
+            <audio controls style={{ width: '100%', marginBottom: '1.25rem' }}>
+              <source src={music.audio_url} type="audio/mpeg" />
+            </audio>
+            <button onClick={() => handleDownload()} style={S.greenBtn}>
+              ⬇️ Download Song (MP3)
+            </button>
+            <a href="https://lighttunes.win" target="_blank" rel="noopener noreferrer" style={S.purpleBtn}>
+              🌍 Publish on LightTunes
+            </a>
           </div>
-          <audio controls style={{ width: '100%', marginBottom: '1.25rem' }}>
-            <source src={music.audio_url} type="audio/mpeg" />
-          </audio>
-          <button onClick={() => handleDownload()} style={S.greenBtn}>
-            ⬇️ Download Song (MP3)
-          </button>
-          <a href="https://lighttunes.win" target="_blank" rel="noopener noreferrer" style={S.purpleBtn}>
-            🌍 Publish on LightTunes
-          </a>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
-

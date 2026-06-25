@@ -370,6 +370,27 @@ export default function App() {
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
         />
+        {mode === 'topic' && (
+  <div style={{
+    marginTop: '0.75rem',
+    padding: '0.75rem',
+    background: 'rgba(255,68,0,0.05)',
+    borderRadius: '8px',
+    border: '1px solid rgba(255,68,0,0.15)',
+    fontSize: '0.78rem',
+    color: '#666',
+    lineHeight: '1.6',
+  }}>
+    💡 <span style={{color:'#888'}}>Pro tip — control each section's style using brackets:</span>
+    <br/>
+    <span style={{color:'#555', fontStyle:'italic'}}>
+      A song about heaven and earth<br/>
+      [Verse 1: monastery chanting, heavenly feel]<br/>
+      [Chorus: electronic, both worlds colliding]<br/>
+      [Bridge: trap beat, the breaking point]
+    </span>
+  </div>
+)}
       </div>
 
       {/* Genre — hidden for haiku */}

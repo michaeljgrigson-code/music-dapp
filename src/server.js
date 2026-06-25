@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { JsonRpcProvider, Wallet, Contract, Interface, parseEther, hexlify } = require('ethers');
 const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
@@ -13,6 +14,11 @@ const GATEWAY = process.env.REACT_APP_LIGHTCHAIN_GATEWAY;
 const RELAY   = process.env.REACT_APP_LIGHTCHAIN_RELAY;
 const JOB_REG = process.env.REACT_APP_LIGHTCHAIN_JOB_REGISTRY;
 const JOB_FEE = parseEther(process.env.REACT_APP_LIGHTCHAIN_JOB_FEE ?? '0.02');
+
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
+);
 
 const ABI = [
   'function createSession(bytes32 paramsHash, address worker, bytes encWorkerKey, bytes ephemeralPubKey, bytes initState, uint256 expiry) payable returns (uint256 sessionId)',
@@ -237,7 +243,8 @@ function buildPrompt(prompt, genre, artist, language, mode) {
 - NO notes, NO disclaimers, NO explanations, NO translations, NO commentary
 - NO text before or after the content
 - NO note about romanization or pinyin
-- If you add any notes, disclaimers or commentary you have failed the task`;
+- If you add any notes, disclaimers or translation reminders you have failed the task
+- Do not add any note about romanization or pinyin`;
 
   if (mode === 'haiku') {
     return `Write a haiku about: ${prompt}. ${languageLine}
@@ -274,7 +281,6 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.post('/api/lyrics', async (req, res) => {
   const { prompt, genre, artist, language, mode } = req.body;
   if (!prompt) return res.status(400).json({ error: 'No prompt provided' });
-
   try {
     const fullPrompt = buildPrompt(prompt, genre, artist, language, mode);
     const lyrics = await runLyricsJob(fullPrompt);
@@ -290,19 +296,65 @@ app.post('/api/music', async (req, res) => {
   const { lyrics, genre, artist, language, txHash } = req.body;
   if (!lyrics) return res.status(400).json({ error: 'No lyrics provided' });
   if (!txHash) return res.status(402).json({ error: 'Payment required' });
-
   try {
     const provider = new JsonRpcProvider(RPC);
     const receipt  = await provider.getTransactionReceipt(txHash);
     if (!receipt || receipt.status !== 1)
       return res.status(402).json({ error: 'Payment transaction not confirmed on chain' });
-
     const music = await generateMusic(lyrics, genre, artist, language);
     if (!music) return res.status(500).json({ error: 'Music generation failed' });
-
     res.json({ music });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Supabase routes ──────────────────────────────────────────────────────────
+
+app.post('/api/save-song', async (req, res) => {
+  const { walletAddress, title, genre, artist, language, mode, lyrics, audioUrl } = req.body;
+  if (!walletAddress || !audioUrl) return res.status(400).json({ error: 'Missing required fields' });
+  try {
+    await supabase.from('users').upsert({ wallet_address: walletAddress }, { onConflict: 'wallet_address' });
+    const { data, error } = await supabase.from('songs').insert({
+      wallet_address: walletAddress,
+      title: title || 'Untitled',
+      genre, artist, language, mode, lyrics,
+      audio_url: audioUrl,
+    }).select().single();
+    if (error) throw error;
+    res.json({ song: data });
+  } catch (err) {
+    console.error('save-song error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/my-songs/:wallet', async (req, res) => {
+  const { wallet } = req.params;
+  try {
+    const { data, error } = await supabase.from('songs')
+      .select('*')
+      .eq('wallet_address', wallet)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ songs: data });
+  } catch (err) {
+    console.error('my-songs error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/song/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data, error } = await supabase.from('songs')
+      .select('*').eq('id', id).single();
+    if (error) throw error;
+    res.json({ song: data });
+  } catch (err) {
+    console.error('song error:', err);
     res.status(500).json({ error: err.message });
   }
 });

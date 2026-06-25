@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserProvider, parseUnits } from 'ethers';
 import frankenLogo from './frankenlabs_logo.png';
-import { saveUser, saveSong, getUserSongs, getSongById } from './supabase';
 
 const RECEIVING_WALLET = '0x7FE522ab4F456cFc41FE7a7a0C94F28801CCA8fc';
 const DOWNLOAD_PRICE   = '5';
@@ -48,7 +47,6 @@ export default function App() {
   const [sharedSong, setSharedSong] = useState(null);
   const [loadingShared, setLoadingShared] = useState(false);
 
-  // Warm up server
   useEffect(() => {
     fetch(`${SERVER_URL}/api/health`).catch(() => {});
   }, []);
@@ -59,15 +57,17 @@ export default function App() {
     const songId = params.get('song');
     if (songId) {
       setLoadingShared(true);
-      getSongById(songId).then(song => {
-        setSharedSong(song);
-        setLoadingShared(false);
-        setView('shared');
-      });
+      fetch(`${SERVER_URL}/api/song/${songId}`)
+        .then(r => r.json())
+        .then(data => {
+          setSharedSong(data.song);
+          setLoadingShared(false);
+          setView('shared');
+        })
+        .catch(() => setLoadingShared(false));
     }
   }, []);
 
-  // Wallet
   useEffect(() => {
     if (window.ethereum?.selectedAddress) {
       setWalletAddress(window.ethereum.selectedAddress);
@@ -82,7 +82,6 @@ export default function App() {
       if (!window.ethereum) throw new Error('MetaMask not found');
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       setWalletAddress(accounts[0]);
-      await saveUser(accounts[0]);
     } catch (err) {
       console.error('Wallet connect error:', err.message);
     }
@@ -107,8 +106,9 @@ export default function App() {
 
   const loadMySongs = async () => {
     if (!walletAddress) return;
-    const songs = await getUserSongs(walletAddress);
-    setMySongs(songs);
+    const res = await fetch(`${SERVER_URL}/api/my-songs/${walletAddress}`);
+    const data = await res.json();
+    setMySongs(data.songs || []);
     setView('library');
   };
 
@@ -187,20 +187,23 @@ export default function App() {
       setStep('done');
       setStatus('');
 
-      // Auto-save to Supabase
+      // Save song via server
       if (walletAddress && data.music?.audio_url) {
         const title = prompt.split('\n')[0].slice(0, 60);
-        const saved = await saveSong({
-          walletAddress,
-          title,
-          genre: genresSelected.join(', '),
-          artist,
-          language,
-          mode,
-          lyrics: lyricsText,
-          audioUrl: data.music.audio_url,
+        const saveRes = await fetch(`${SERVER_URL}/api/save-song`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress,
+            title,
+            genre: genresSelected.join(', '),
+            artist, language, mode,
+            lyrics: lyricsText,
+            audioUrl: data.music.audio_url,
+          }),
         });
-        setSavedSong(saved);
+        const saveData = await saveRes.json();
+        if (saveData.song) setSavedSong(saveData.song);
       }
     } catch (err) {
       setStatus('Music generation error: ' + err.message);
@@ -353,28 +356,38 @@ export default function App() {
     return 'Your Lyrics';
   };
 
-  // ─── Shared song view ─────────────────────────────────────────────────────
+  const Sidebar = () => (
+    <div style={S.sidebar}>
+      <img src={frankenLogo} alt="FrankenLabs"
+        style={{ width: '140px', borderRadius: '12px', border: '2px solid rgba(51,255,102,0.4)' }} />
+      <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.75rem', fontWeight: '900',
+        letterSpacing: '2px', color: '#33ff66', textAlign: 'center', textTransform: 'uppercase' }}>
+        FRANKENLABS
+      </div>
+      <div style={{ color: '#555', fontSize: '0.65rem', letterSpacing: '3px',
+        textTransform: 'uppercase', textAlign: 'center' }}>PRESENTS</div>
+      {walletAddress && (
+        <button onClick={view === 'library' ? () => setView('home') : loadMySongs}
+          style={{ marginTop: '0.5rem', background: 'rgba(255,68,0,0.1)',
+            border: '1px solid rgba(255,68,0,0.3)', color: '#ff6600',
+            borderRadius: '8px', padding: '0.5rem', fontSize: '0.75rem',
+            cursor: 'pointer', width: '100%', fontWeight: 'bold' }}>
+          {view === 'library' ? '← Back' : '🎵 My Songs'}
+        </button>
+      )}
+    </div>
+  );
+
+  // ─── Shared song view ────────────────────────────────────────────────────
   if (view === 'shared') {
     return (
       <div style={S.app}>
-        <div style={S.sidebar}>
-          <img src={frankenLogo} alt="FrankenLabs"
-            style={{ width: '140px', borderRadius: '12px', border: '2px solid rgba(51,255,102,0.4)' }} />
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.75rem', fontWeight: '900',
-            letterSpacing: '2px', color: '#33ff66', textAlign: 'center', textTransform: 'uppercase' }}>
-            FRANKENLABS
-          </div>
-          <div style={{ color: '#555', fontSize: '0.65rem', letterSpacing: '3px',
-            textTransform: 'uppercase', textAlign: 'center' }}>PRESENTS</div>
-        </div>
-
+        <Sidebar />
         <h1 style={S.title}>🎵 LyricsAI</h1>
         <p style={S.sub}>Powered by LightChain</p>
 
         {loadingShared && (
-          <div style={{ textAlign: 'center', color: '#aa00ff', marginTop: '3rem' }}>
-            ⚡ Loading song...
-          </div>
+          <div style={{ textAlign: 'center', color: '#aa00ff', marginTop: '3rem' }}>⚡ Loading song...</div>
         )}
 
         {sharedSong && (
@@ -389,7 +402,6 @@ export default function App() {
                 {sharedSong.lyrics}
               </pre>
             </div>
-
             {sharedSong.audio_url && (
               <div style={{ maxWidth: '600px', margin: '0 auto', background: 'rgba(255,68,0,0.05)',
                 borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
@@ -406,7 +418,6 @@ export default function App() {
                 </a>
               </div>
             )}
-
             <div style={{ textAlign: 'center', marginTop: '2rem' }}>
               <button onClick={() => { setView('home'); window.history.pushState({}, '', '/'); }}
                 style={S.outlineBtn}>
@@ -419,24 +430,11 @@ export default function App() {
     );
   }
 
-  // ─── My library view ──────────────────────────────────────────────────────
+  // ─── Library view ─────────────────────────────────────────────────────────
   if (view === 'library') {
     return (
       <div style={S.app}>
-        <div style={S.sidebar}>
-          <img src={frankenLogo} alt="FrankenLabs"
-            style={{ width: '140px', borderRadius: '12px', border: '2px solid rgba(51,255,102,0.4)' }} />
-          <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.75rem', fontWeight: '900',
-            letterSpacing: '2px', color: '#33ff66', textAlign: 'center', textTransform: 'uppercase' }}>
-            FRANKENLABS
-          </div>
-          <div style={{ color: '#555', fontSize: '0.65rem', letterSpacing: '3px',
-            textTransform: 'uppercase', textAlign: 'center' }}>PRESENTS</div>
-          <button onClick={() => setView('home')} style={{ ...S.outlineBtn, marginTop: '1rem', width: '100%' }}>
-            ← Back
-          </button>
-        </div>
-
+        <Sidebar />
         <h1 style={S.title}>🎵 My Songs</h1>
         <p style={S.sub}>Your LightChain library</p>
 
@@ -458,26 +456,20 @@ export default function App() {
                       {song.artist && ` · ${song.artist} style`}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCopyLink(song.id)}
-                    style={{
-                      background: linkCopied ? 'rgba(0,200,100,0.15)' : 'rgba(255,255,255,0.06)',
-                      border: `1px solid ${linkCopied ? 'rgba(0,200,100,0.4)' : 'rgba(255,68,0,0.3)'}`,
-                      color: linkCopied ? '#00cc66' : '#aaa',
-                      borderRadius: '6px', padding: '0.4rem 0.9rem',
-                      fontSize: '0.8rem', cursor: 'pointer',
-                    }}
-                  >
-                    {linkCopied ? '✅ Copied!' : '🔗 Copy Link'}
+                  <button onClick={() => handleCopyLink(song.id)} style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,68,0,0.3)',
+                    color: '#aaa', borderRadius: '6px', padding: '0.4rem 0.9rem',
+                    fontSize: '0.8rem', cursor: 'pointer',
+                  }}>
+                    🔗 Copy Link
                   </button>
                 </div>
-
                 {song.audio_url && (
                   <audio controls style={{ width: '100%', marginBottom: '0.75rem' }}>
                     <source src={song.audio_url} type="audio/mpeg" />
                   </audio>
                 )}
-
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button onClick={() => handleDownload(song.audio_url)}
                     style={{ ...S.greenBtn, fontSize: '0.85rem', padding: '0.6rem' }}>
@@ -499,33 +491,7 @@ export default function App() {
   // ─── Main view ────────────────────────────────────────────────────────────
   return (
     <div style={S.app}>
-
-      <div style={S.sidebar}>
-        <img src={frankenLogo} alt="FrankenLabs"
-          style={{ width: '140px', borderRadius: '12px', border: '2px solid rgba(51,255,102,0.4)' }} />
-        <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.75rem', fontWeight: '900',
-          letterSpacing: '2px', color: '#33ff66', textAlign: 'center', textTransform: 'uppercase' }}>
-          FRANKENLABS
-        </div>
-        <div style={{ color: '#555', fontSize: '0.65rem', letterSpacing: '3px',
-          textTransform: 'uppercase', textAlign: 'center' }}>PRESENTS</div>
-        <div style={{ marginTop: '1rem', background: 'rgba(51,255,102,0.06)',
-          border: '1px solid rgba(51,255,102,0.2)', borderRadius: '8px',
-          padding: '0.75rem', textAlign: 'center' }}>
-          <div style={{ color: '#33ff66', fontSize: '0.7rem', letterSpacing: '1px', lineHeight: '1.6' }}>All queries cost</div>
-          <div style={{ color: '#ff4400', fontWeight: 'bold', fontSize: '1rem' }}>5 LCAI</div>
-          <div style={{ color: '#33ff66', fontSize: '0.7rem', letterSpacing: '1px', lineHeight: '1.6' }}>per song</div>
-        </div>
-        {walletAddress && (
-          <button onClick={loadMySongs}
-            style={{ marginTop: '1rem', background: 'rgba(255,68,0,0.1)',
-              border: '1px solid rgba(255,68,0,0.3)', color: '#ff6600',
-              borderRadius: '8px', padding: '0.5rem', fontSize: '0.75rem',
-              cursor: 'pointer', width: '100%', fontWeight: 'bold' }}>
-            🎵 My Songs
-          </button>
-        )}
-      </div>
+      <Sidebar />
 
       {['♪','♫','♩','♬','♭'].map((n, i) => (
         <div key={i} style={{ position: 'fixed', fontSize: '1.5rem', opacity: 0.08,
@@ -713,10 +679,10 @@ export default function App() {
             ⬇️ Download Song (MP3)
           </button>
           {savedSong && (
-            <button
-              onClick={() => handleCopyLink(savedSong.id)}
-              style={{ ...S.outlineBtn, width: '100%', marginTop: '0.75rem', padding: '0.9rem',
-                fontSize: '1rem', letterSpacing: '2px', textTransform: 'uppercase' }}>
+            <button onClick={() => handleCopyLink(savedSong.id)} style={{
+              ...S.outlineBtn, width: '100%', marginTop: '0.75rem', padding: '0.9rem',
+              fontSize: '1rem', letterSpacing: '2px', textTransform: 'uppercase',
+            }}>
               {linkCopied ? '✅ Link Copied!' : '🔗 Copy Shareable Link'}
             </button>
           )}
@@ -725,7 +691,6 @@ export default function App() {
           </a>
         </div>
       )}
-
     </div>
   );
 }

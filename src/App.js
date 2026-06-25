@@ -7,9 +7,10 @@ const DOWNLOAD_PRICE   = '5';
 const SERVER_URL       = 'https://music-dapp.onrender.com';
 
 const genres = [
-  'Rock', 'Metal', 'Big Band', 'Jazz', 'Hip Hop',
-  'Country', 'Pop', 'Blues', 'Electronic', 'R&B',
-  'Punk', 'Folk', 'Classical', 'Reggae',
+  'Rock', 'Metal', 'Big Band', 'Jazz', 'Hip Hop', 'Rap', 'Drill', 'Trap',
+  'Country', 'Pop', 'Blues', 'Electronic', 'R&B', 'Punk', 'Folk', 'Classical',
+  'Reggae', 'Afrobeats', 'Gospel', 'Ambient', 'Soundtrack', 'Indie', 'Emo',
+  'Grunge', 'Latin', 'Dancehall', 'Soul', 'Throat Singing', 'Monastery Chanting',
 ];
 
 const languages = [
@@ -18,26 +19,31 @@ const languages = [
   'Hindi', 'Russian', 'Dutch', 'Swedish', 'Polish',
 ];
 
+const modes = [
+  { id: 'topic', label: '💡 Song topic' },
+  { id: 'own', label: '✏️ My own lyrics' },
+  { id: 'poem', label: '📜 Poem' },
+  { id: 'haiku', label: '🌸 Haiku' },
+];
+
 export default function App() {
-  const [prompt, setPrompt]       = useState('');
-  const [genres_selected, setGenresSelected] = useState(['Rock']);
-  const [artist, setArtist]       = useState('');
-  const [language, setLanguage]   = useState('English');
-  const [mode, setMode]           = useState('topic');
-  const [step, setStep]           = useState('idle');
-  const [lyrics, setLyrics]       = useState('');
-  const [music, setMusic]         = useState(null);
-  const [status, setStatus]       = useState('');
-  const [copied, setCopied]       = useState(false);
-  const [payError, setPayError]   = useState('');
+  const [prompt, setPrompt]         = useState('');
+  const [genresSelected, setGenresSelected] = useState(['Rock']);
+  const [artist, setArtist]         = useState('');
+  const [language, setLanguage]     = useState('English');
+  const [mode, setMode]             = useState('topic');
+  const [step, setStep]             = useState('idle');
+  const [lyrics, setLyrics]         = useState('');
+  const [music, setMusic]           = useState(null);
+  const [status, setStatus]         = useState('');
+  const [copied, setCopied]         = useState(false);
+  const [payError, setPayError]     = useState('');
   const [walletAddress, setWalletAddress] = useState(null);
 
-  // Warm up server on page load
   useEffect(() => {
     fetch(`${SERVER_URL}/api/health`).catch(() => {});
   }, []);
 
-  // Wallet
   useEffect(() => {
     if (window.ethereum?.selectedAddress) {
       setWalletAddress(window.ethereum.selectedAddress);
@@ -65,15 +71,17 @@ export default function App() {
   const toggleGenre = (g) => {
     setGenresSelected(prev => {
       if (prev.includes(g)) {
-        if (prev.length === 1) return prev; // must keep at least one
+        if (prev.length === 1) return prev;
         return prev.filter(x => x !== g);
       }
-      if (prev.length >= 3) return prev; // max 3
+      if (prev.length >= 3) return prev;
       return [...prev, g];
     });
   };
 
-  const handleGenerateLyrics = async () => {
+  const isPoemOrHaiku = mode === 'poem' || mode === 'haiku';
+
+  const handleGenerate = async () => {
     if (!prompt) return;
     setStep('generatingLyrics');
     setStatus('Connecting to LightChain network...');
@@ -83,10 +91,16 @@ export default function App() {
 
     try {
       const promptPayload = mode === 'own' ? `__own__${prompt}` : prompt;
-      const res  = await fetch(`${SERVER_URL}/api/lyrics`, {
+      const res = await fetch(`${SERVER_URL}/api/lyrics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptPayload, genre: genres_selected.join(', '), artist, language }),
+        body: JSON.stringify({
+          prompt: promptPayload,
+          genre: genresSelected.join(', '),
+          artist,
+          language,
+          mode,
+        }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -104,27 +118,22 @@ export default function App() {
     setStep('paying');
 
     try {
-      if (!window.ethereum) throw new Error('No wallet detected. Connect a wallet first.');
+      if (!window.ethereum) throw new Error('No wallet detected.');
       const provider = new BrowserProvider(window.ethereum);
       const signer   = await provider.getSigner();
       const amount   = parseUnits(DOWNLOAD_PRICE, 18);
 
       setStatus('Confirm the transaction in your wallet...');
-      const tx = await signer.sendTransaction({
-        to: RECEIVING_WALLET,
-        value: amount,
-      });
+      const tx = await signer.sendTransaction({ to: RECEIVING_WALLET, value: amount });
       setStatus('Transaction submitted, waiting for confirmation...');
       const receipt = await tx.wait(1);
 
       await handleGenerateMusic(lyrics, receipt.hash);
     } catch (err) {
       setPayError(
-        err.message?.includes('user rejected')
-          ? 'Transaction cancelled.'
-          : err.message?.includes('insufficient')
-          ? `Insufficient LCAI. You need ${DOWNLOAD_PRICE} LCAI.`
-          : err.message || 'Payment failed.'
+        err.message?.includes('user rejected') ? 'Transaction cancelled.'
+        : err.message?.includes('insufficient') ? `Insufficient LCAI. You need ${DOWNLOAD_PRICE} LCAI.`
+        : err.message || 'Payment failed.'
       );
       setStep('lyrics');
     }
@@ -135,10 +144,10 @@ export default function App() {
     setStatus('🎵 Generating your song — this takes 1-3 minutes...');
 
     try {
-      const res  = await fetch(`${SERVER_URL}/api/music`, {
+      const res = await fetch(`${SERVER_URL}/api/music`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lyrics: lyricsText, genre: genres_selected.join(', '), artist, language, txHash }),
+        body: JSON.stringify({ lyrics: lyricsText, genre: genresSelected.join(', '), artist, language, txHash }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -165,13 +174,9 @@ export default function App() {
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
-      a.href     = url;
-      a.download = 'LyricsAI-song.mp3';
-      a.click();
+      a.href = url; a.download = 'LyricsAI-song.mp3'; a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      window.open(music.audio_url, '_blank');
-    }
+    } catch { window.open(music.audio_url, '_blank'); }
   };
 
   const S = {
@@ -183,173 +188,125 @@ export default function App() {
         radial-gradient(ellipse at 50% 80%, #1a0a2a 0%, transparent 50%),
         #0a0a0a
       `,
-      color: 'white',
-      padding: '2rem 2rem 2rem 200px',
-      fontFamily: 'inherit',
+      color: 'white', padding: '2rem 2rem 2rem 200px', fontFamily: 'inherit',
     },
     sidebar: {
-      position: 'fixed',
-      left: 0, top: 0,
-      height: '100vh',
-      width: '180px',
-      background: 'rgba(0,0,0,0.7)',
-      borderRight: '1px solid rgba(51,255,102,0.2)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '1rem',
-      padding: '1.5rem 1rem',
-      zIndex: 100,
+      position: 'fixed', left: 0, top: 0, height: '100vh', width: '180px',
+      background: 'rgba(0,0,0,0.7)', borderRight: '1px solid rgba(51,255,102,0.2)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', gap: '1rem', padding: '1.5rem 1rem', zIndex: 100,
     },
     title: {
-      textAlign: 'center',
-      fontSize: '3rem',
-      fontWeight: 900,
-      letterSpacing: '4px',
+      textAlign: 'center', fontSize: '3rem', fontWeight: 900, letterSpacing: '4px',
       textTransform: 'uppercase',
       background: 'linear-gradient(135deg,#ff4400,#ff0088,#aa00ff,#ff4400)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      marginBottom: '0.5rem',
+      WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '0.5rem',
     },
     sub: {
-      textAlign: 'center',
-      color: '#666',
-      letterSpacing: '6px',
-      textTransform: 'uppercase',
-      fontSize: '0.8rem',
-      marginBottom: '2.5rem',
+      textAlign: 'center', color: '#666', letterSpacing: '6px',
+      textTransform: 'uppercase', fontSize: '0.8rem', marginBottom: '2.5rem',
     },
     card: {
-      maxWidth: '600px',
-      margin: '0 auto 1.5rem',
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,68,0,0.2)',
-      borderRadius: '12px',
-      padding: '1.25rem',
+      maxWidth: '600px', margin: '0 auto 1.5rem',
+      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,68,0,0.2)',
+      borderRadius: '12px', padding: '1.25rem',
     },
     label: {
-      display: 'block',
-      color: '#aaa',
-      marginBottom: '0.5rem',
-      fontSize: '0.85rem',
-      letterSpacing: '2px',
-      textTransform: 'uppercase',
+      display: 'block', color: '#aaa', marginBottom: '0.5rem',
+      fontSize: '0.85rem', letterSpacing: '2px', textTransform: 'uppercase',
     },
-    sublabel: {
-      color: '#555',
-      fontSize: '0.75rem',
-      marginBottom: '0.75rem',
-      display: 'block',
-    },
+    sublabel: { color: '#555', fontSize: '0.75rem', marginBottom: '0.75rem', display: 'block' },
     textarea: {
-      width: '100%',
-      background: 'rgba(0,0,0,0.4)',
-      borderRadius: '8px',
-      padding: '1rem',
-      color: 'white',
-      border: '1px solid rgba(255,68,0,0.3)',
-      resize: 'none',
-      boxSizing: 'border-box',
-      fontFamily: 'inherit',
-      fontSize: '1rem',
-      outline: 'none',
+      width: '100%', background: 'rgba(0,0,0,0.4)', borderRadius: '8px',
+      padding: '1rem', color: 'white', border: '1px solid rgba(255,68,0,0.3)',
+      resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '1rem', outline: 'none',
     },
     input: {
-      width: '100%',
-      background: 'rgba(0,0,0,0.4)',
-      borderRadius: '8px',
-      padding: '0.9rem 1rem',
-      color: 'white',
-      border: '1px solid rgba(255,68,0,0.3)',
-      boxSizing: 'border-box',
-      fontFamily: 'inherit',
-      fontSize: '1rem',
-      outline: 'none',
-    },
-    toggle: {
-      display: 'flex',
-      background: 'rgba(0,0,0,0.4)',
-      borderRadius: '8px',
-      padding: '4px',
-      gap: '4px',
+      width: '100%', background: 'rgba(0,0,0,0.4)', borderRadius: '8px',
+      padding: '0.9rem 1rem', color: 'white', border: '1px solid rgba(255,68,0,0.3)',
+      boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '1rem', outline: 'none',
     },
     btnWrap: { display: 'flex', flexWrap: 'wrap', gap: '0.6rem' },
+    modeBtn: (active) => ({
+      padding: '0.6rem 1.2rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold',
+      background: active ? 'linear-gradient(135deg,#ff4400,#aa00ff)' : 'rgba(0,0,0,0.4)',
+      border: active ? '1px solid transparent' : '1px solid rgba(255,68,0,0.3)',
+      color: active ? 'white' : '#888', fontSize: '0.9rem',
+    }),
     genreBtn: (active, maxed) => ({
-      padding: '0.4rem 1rem',
-      borderRadius: '999px',
+      padding: '0.4rem 1rem', borderRadius: '999px',
       cursor: maxed && !active ? 'not-allowed' : 'pointer',
       background: active ? 'linear-gradient(135deg,#ff4400,#aa00ff)' : 'transparent',
       border: active ? '1px solid transparent' : '1px solid rgba(255,68,0,0.3)',
       color: active ? 'white' : maxed ? '#444' : '#888',
-      fontWeight: active ? 'bold' : 'normal',
-      fontSize: '0.85rem',
+      fontWeight: active ? 'bold' : 'normal', fontSize: '0.85rem',
       opacity: maxed && !active ? 0.4 : 1,
     }),
     langBtn: (active) => ({
-      padding: '0.4rem 1rem',
-      borderRadius: '999px',
-      cursor: 'pointer',
+      padding: '0.4rem 1rem', borderRadius: '999px', cursor: 'pointer',
       background: active ? 'linear-gradient(135deg,#0066ff,#aa00ff)' : 'transparent',
       border: active ? '1px solid transparent' : '1px solid rgba(0,100,255,0.3)',
-      color: active ? 'white' : '#888',
-      fontWeight: active ? 'bold' : 'normal',
-      fontSize: '0.85rem',
-    }),
-    toggleBtn: (active) => ({
-      flex: 1, padding: '0.6rem', borderRadius: '6px', border: 'none',
-      cursor: 'pointer', fontWeight: 'bold',
-      background: active ? 'linear-gradient(135deg,#ff4400,#aa00ff)' : 'transparent',
-      color: active ? 'white' : '#666',
+      color: active ? 'white' : '#888', fontWeight: active ? 'bold' : 'normal', fontSize: '0.85rem',
     }),
     primaryBtn: (disabled) => ({
       width: '100%',
       background: disabled ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg,#ff4400,#ff0088,#aa00ff)',
-      color: disabled ? '#444' : 'white',
-      border: 'none', borderRadius: '8px', padding: '1rem',
+      color: disabled ? '#444' : 'white', border: 'none', borderRadius: '8px', padding: '1rem',
       fontSize: '1.1rem', fontWeight: 900, letterSpacing: '2px',
       textTransform: 'uppercase', cursor: disabled ? 'default' : 'pointer',
     }),
     greenBtn: {
-      width: '100%',
-      background: 'linear-gradient(135deg,#00cc66,#00aa44)',
+      width: '100%', background: 'linear-gradient(135deg,#00cc66,#00aa44)',
       color: 'white', border: 'none', borderRadius: '8px', padding: '0.9rem',
       fontSize: '1rem', fontWeight: 900, letterSpacing: '2px',
       textTransform: 'uppercase', cursor: 'pointer',
     },
+    purpleBtn: {
+      display: 'block', width: '100%',
+      background: 'linear-gradient(135deg,#0066ff,#aa00ff)',
+      color: 'white', border: 'none', borderRadius: '8px', padding: '0.9rem',
+      fontSize: '1rem', fontWeight: 900, letterSpacing: '2px',
+      textTransform: 'uppercase', cursor: 'pointer', textAlign: 'center',
+      textDecoration: 'none', marginTop: '0.75rem', boxSizing: 'border-box',
+    },
   };
 
-  const isGenerating = step === 'generatingLyrics' || step === 'generatingMusic';
-  const showLyrics   = ['lyrics', 'paying', 'generatingMusic', 'done'].includes(step);
-  const showPaywall  = step === 'lyrics';
-  const showPaying   = step === 'paying' || step === 'generatingMusic';
-  const showMusic    = step === 'done' && music?.audio_url;
-  const maxGenres    = genres_selected.length >= 3;
+  const isGenerating  = step === 'generatingLyrics' || step === 'generatingMusic';
+  const showLyrics    = ['lyrics', 'paying', 'generatingMusic', 'done'].includes(step);
+  const showPaywall   = step === 'lyrics' && !isPoemOrHaiku;
+  const showPaying    = step === 'paying' || step === 'generatingMusic';
+  const showMusic     = step === 'done' && music?.audio_url;
+  const maxGenres     = genresSelected.length >= 3;
+
+  const generateLabel = () => {
+    if (step === 'generatingLyrics') return '✍️ Writing...';
+    if (mode === 'poem') return '📜 Generate Poem (Free)';
+    if (mode === 'haiku') return '🌸 Generate Haiku (Free)';
+    return '🎸 Generate Lyrics (Free)';
+  };
+
+  const outputLabel = () => {
+    if (mode === 'poem') return 'Your Poem';
+    if (mode === 'haiku') return 'Your Haiku';
+    return 'Your Lyrics';
+  };
 
   return (
     <div style={S.app}>
 
       {/* Sidebar */}
       <div style={S.sidebar}>
-        <img
-          src={frankenLogo}
-          alt="FrankenLabs"
-          style={{ width: '140px', borderRadius: '12px', border: '2px solid rgba(51,255,102,0.4)' }}
-        />
-        <div style={{
-          fontFamily: 'Georgia, serif', fontSize: '0.75rem', fontWeight: '900',
-          letterSpacing: '2px', color: '#33ff66', textAlign: 'center', textTransform: 'uppercase',
-        }}>FRANKENLABS</div>
-        <div style={{
-          color: '#555', fontSize: '0.65rem', letterSpacing: '3px',
-          textTransform: 'uppercase', textAlign: 'center',
-        }}>PRESENTS</div>
-        <div style={{
-          marginTop: '1rem', background: 'rgba(51,255,102,0.06)',
+        <img src={frankenLogo} alt="FrankenLabs"
+          style={{ width: '140px', borderRadius: '12px', border: '2px solid rgba(51,255,102,0.4)' }} />
+        <div style={{ fontFamily: 'Georgia, serif', fontSize: '0.75rem', fontWeight: '900',
+          letterSpacing: '2px', color: '#33ff66', textAlign: 'center', textTransform: 'uppercase' }}>
+          FRANKENLABS
+        </div>
+        <div style={{ color: '#555', fontSize: '0.65rem', letterSpacing: '3px',
+          textTransform: 'uppercase', textAlign: 'center' }}>PRESENTS</div>
+        <div style={{ marginTop: '1rem', background: 'rgba(51,255,102,0.06)',
           border: '1px solid rgba(51,255,102,0.2)', borderRadius: '8px',
-          padding: '0.75rem', textAlign: 'center',
-        }}>
+          padding: '0.75rem', textAlign: 'center' }}>
           <div style={{ color: '#33ff66', fontSize: '0.7rem', letterSpacing: '1px', lineHeight: '1.6' }}>All queries cost</div>
           <div style={{ color: '#ff4400', fontWeight: 'bold', fontSize: '1rem' }}>5 LCAI</div>
           <div style={{ color: '#33ff66', fontSize: '0.7rem', letterSpacing: '1px', lineHeight: '1.6' }}>per song</div>
@@ -358,11 +315,9 @@ export default function App() {
 
       {/* Floating notes */}
       {['♪','♫','♩','♬','♭'].map((n, i) => (
-        <div key={i} style={{
-          position: 'fixed', fontSize: '1.5rem', opacity: 0.08,
+        <div key={i} style={{ position: 'fixed', fontSize: '1.5rem', opacity: 0.08,
           top: `${15 + i * 15}%`, left: `${5 + i * 18}%`,
-          color: '#ff4400', pointerEvents: 'none', userSelect: 'none',
-        }}>{n}</div>
+          color: '#ff4400', pointerEvents: 'none', userSelect: 'none' }}>{n}</div>
       ))}
 
       <h1 style={S.title}>🎵 LyricsAI</h1>
@@ -374,58 +329,69 @@ export default function App() {
           background: walletAddress ? 'rgba(0,200,100,0.15)' : 'linear-gradient(135deg,#ff4400,#aa00ff)',
           border: walletAddress ? '1px solid rgba(0,200,100,0.4)' : 'none',
           color: walletAddress ? '#00cc66' : 'white',
-          borderRadius: '8px', padding: '0.5rem 1rem',
-          cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold',
+          borderRadius: '8px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold',
         }}>
           {walletAddress ? `✅ ${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}` : '🔌 Connect Wallet'}
         </button>
       </div>
 
-      {/* Mode toggle */}
+      {/* Mode selector */}
       <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem' }}>
-        <div style={S.toggle}>
-          <button onClick={() => { setMode('topic'); setPrompt(''); }} style={S.toggleBtn(mode === 'topic')}>
-            💡 Give me a topic
-          </button>
-          <button onClick={() => { setMode('own'); setPrompt(''); }} style={S.toggleBtn(mode === 'own')}>
-            ✏️ Use my own lyrics
-          </button>
+        <label style={S.label}>What do you want to create?</label>
+        <div style={S.btnWrap}>
+          {modes.map(m => (
+            <button key={m.id} onClick={() => { setMode(m.id); setPrompt(''); }}
+              style={S.modeBtn(mode === m.id)}>
+              {m.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Prompt */}
       <div style={S.card}>
-        <label style={S.label}>{mode === 'topic' ? "What's your song about?" : 'Paste your lyrics'}</label>
+        <label style={S.label}>
+          {mode === 'topic' && "What's your song about?"}
+          {mode === 'own' && 'Paste your lyrics'}
+          {mode === 'poem' && "What's your poem about?"}
+          {mode === 'haiku' && "What's your haiku about?"}
+        </label>
+        {mode === 'haiku' && (
+          <span style={S.sublabel}>A haiku is 3 lines: 5 syllables, 7 syllables, 5 syllables</span>
+        )}
         <textarea
-          style={{ ...S.textarea, height: mode === 'own' ? '200px' : '120px' }}
-          placeholder={mode === 'topic'
-            ? 'e.g. a trucker who misses home, driving through Nevada at 3am...'
-            : "Paste your lyrics here and we'll style them for you..."}
+          style={{ ...S.textarea, height: mode === 'own' ? '200px' : mode === 'haiku' ? '80px' : '120px' }}
+          placeholder={
+            mode === 'topic' ? 'e.g. a trucker who misses home, driving through Nevada at 3am...' :
+            mode === 'own' ? "Paste your lyrics here and we'll style them for you..." :
+            mode === 'poem' ? 'e.g. the ocean at night, the feeling of being lost...' :
+            'e.g. cherry blossoms falling, a quiet morning...'
+          }
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
         />
       </div>
 
-      {/* Genre — multi select up to 3 */}
-      <div style={S.card}>
-        <label style={S.label}>Pick up to 3 genres</label>
-        <span style={S.sublabel}>
-          {genres_selected.length === 3
-            ? '✅ 3 selected — deselect one to change'
-            : `${genres_selected.length} selected`}
-        </span>
-        <div style={S.btnWrap}>
-          {genres.map(g => (
-            <button
-              key={g}
-              onClick={() => toggleGenre(g)}
-              style={S.genreBtn(genres_selected.includes(g), maxGenres)}
-            >
-              {g}
-            </button>
-          ))}
+      {/* Genre — hidden for haiku */}
+      {mode !== 'haiku' && (
+        <div style={S.card}>
+          <label style={S.label}>
+            {isPoemOrHaiku ? 'Pick a style' : 'Pick up to 3 genres'}
+          </label>
+          <span style={S.sublabel}>
+            {mode === 'poem' ? 'Influences the tone and rhythm of the poem' :
+              genresSelected.length === 3 ? '✅ 3 selected — deselect one to change' :
+              `${genresSelected.length} selected`}
+          </span>
+          <div style={S.btnWrap}>
+            {genres.map(g => (
+              <button key={g} onClick={() => toggleGenre(g)} style={S.genreBtn(genresSelected.includes(g), maxGenres)}>
+                {g}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Language */}
       <div style={S.card}>
@@ -437,15 +403,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* Artist */}
-      <div style={S.card}>
-        <label style={S.label}>Artist or band style <span style={{ color: '#555' }}>— optional</span></label>
-        <input
-          type="text" style={S.input}
-          placeholder="e.g. Korn, Harry Styles, Johnny Cash, Billie Eilish..."
-          value={artist} onChange={e => setArtist(e.target.value)}
-        />
-      </div>
+      {/* Artist — hidden for haiku and poem */}
+      {!isPoemOrHaiku && (
+        <div style={S.card}>
+          <label style={S.label}>Artist or band style <span style={{ color: '#555' }}>— optional</span></label>
+          <input type="text" style={S.input}
+            placeholder="e.g. Korn, Harry Styles, Johnny Cash, Billie Eilish..."
+            value={artist} onChange={e => setArtist(e.target.value)} />
+        </div>
+      )}
 
       {/* Status */}
       {status && (
@@ -454,32 +420,30 @@ export default function App() {
         </div>
       )}
 
-      {/* Generate lyrics button */}
+      {/* Generate button */}
       <div style={{ maxWidth: '600px', margin: '0 auto 2rem' }}>
-        <button
-          onClick={handleGenerateLyrics}
-          disabled={isGenerating || !prompt}
-          style={S.primaryBtn(isGenerating || !prompt)}
-        >
-          {step === 'generatingLyrics' ? '✍️ Writing lyrics...' : '🎸 Generate Lyrics (Free)'}
+        <button onClick={handleGenerate} disabled={isGenerating || !prompt} style={S.primaryBtn(isGenerating || !prompt)}>
+          {generateLabel()}
         </button>
       </div>
 
-      {/* Lyrics box */}
+      {/* Output box */}
       {showLyrics && (
-        <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', background: 'rgba(255,68,0,0.05)', borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', background: 'rgba(255,68,0,0.05)',
+          borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div style={{ background: 'linear-gradient(135deg,#ff4400,#aa00ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing: '2px', textTransform: 'uppercase' }}>
-              Your Lyrics
+            <div style={{ background: 'linear-gradient(135deg,#ff4400,#aa00ff)', WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent', fontWeight: 'bold', fontSize: '1.1rem',
+              letterSpacing: '2px', textTransform: 'uppercase' }}>
+              {outputLabel()}
             </div>
             <button onClick={handleCopy} style={{
               background: copied ? 'rgba(0,200,100,0.15)' : 'rgba(255,255,255,0.06)',
               border: `1px solid ${copied ? 'rgba(0,200,100,0.4)' : 'rgba(255,68,0,0.3)'}`,
-              color: copied ? '#00cc66' : '#aaa',
-              borderRadius: '6px', padding: '0.4rem 0.9rem',
+              color: copied ? '#00cc66' : '#aaa', borderRadius: '6px', padding: '0.4rem 0.9rem',
               fontSize: '0.8rem', cursor: 'pointer', letterSpacing: '1px',
             }}>
-              {copied ? '✅ Copied!' : '📋 Copy Lyrics'}
+              {copied ? '✅ Copied!' : '📋 Copy'}
             </button>
           </div>
           <pre style={{ whiteSpace: 'pre-wrap', color: '#e5e7eb', lineHeight: '1.8', margin: 0 }}>
@@ -488,16 +452,21 @@ export default function App() {
         </div>
       )}
 
-      {/* Paywall */}
+      {/* Paywall — only for songs */}
       {showPaywall && (
-        <div style={{ maxWidth: '600px', margin: '0 auto 2rem', background: 'rgba(0,0,0,0.35)', borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(170,0,255,0.3)', textAlign: 'center' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto 2rem', background: 'rgba(0,0,0,0.35)',
+          borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(170,0,255,0.3)', textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎵</div>
-          <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.4rem' }}>Generate &amp; Download Your Song</div>
+          <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.4rem' }}>
+            Generate &amp; Download Your Song
+          </div>
           <div style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
             Pay <span style={{ color: '#ff4400', fontWeight: 'bold' }}>{DOWNLOAD_PRICE} LCAI</span> to generate the music and unlock the download.
           </div>
           {!walletAddress && (
-            <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1rem' }}>👆 Connect your wallet above first</div>
+            <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1rem' }}>
+              👆 Connect your wallet above first
+            </div>
           )}
           <button onClick={handlePay} disabled={!walletAddress} style={S.primaryBtn(!walletAddress)}>
             {walletAddress ? `💎 Pay ${DOWNLOAD_PRICE} LCAI & Generate Song` : '🔒 Connect Wallet to Continue'}
@@ -516,10 +485,12 @@ export default function App() {
         </div>
       )}
 
-      {/* Music player + download */}
+      {/* Music player + download + lighttunes */}
       {showMusic && (
-        <div style={{ maxWidth: '600px', margin: '0 auto', background: 'rgba(255,68,0,0.05)', borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
-          <div style={{ color: '#aa00ff', fontWeight: 'bold', marginBottom: '1rem', letterSpacing: '2px', textTransform: 'uppercase', fontSize: '1.1rem' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto', background: 'rgba(255,68,0,0.05)',
+          borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(255,68,0,0.3)' }}>
+          <div style={{ color: '#aa00ff', fontWeight: 'bold', marginBottom: '1rem',
+            letterSpacing: '2px', textTransform: 'uppercase', fontSize: '1.1rem' }}>
             🎸 Your Song
           </div>
           <audio controls style={{ width: '100%', marginBottom: '1.25rem' }}>
@@ -528,6 +499,9 @@ export default function App() {
           <button onClick={handleDownload} style={S.greenBtn}>
             ⬇️ Download Song (MP3)
           </button>
+          <a href="https://lighttunes.win" target="_blank" rel="noopener noreferrer" style={S.purpleBtn}>
+            🌍 Publish on LightTunes
+          </a>
         </div>
       )}
 

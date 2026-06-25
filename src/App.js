@@ -10,7 +10,7 @@ const genres = [
   'Rock', 'Metal', 'Big Band', 'Jazz', 'Hip Hop', 'Rap', 'Drill', 'Trap',
   'Country', 'Pop', 'Blues', 'Electronic', 'R&B', 'Punk', 'Folk', 'Classical',
   'Reggae', 'Afrobeats', 'Gospel', 'Ambient', 'Soundtrack', 'Indie', 'Emo',
-  'Grunge', 'Latin', 'Dancehall', 'Soul', 'Throat Singing', 'Monastery Chanting',
+  'Grunge', 'Latin', 'Dancehall', 'Soul', 'Throat Singing', 'Monastery Chanting', 'Drum and Bass', 'Dubstep',
 ];
 
 const languages = [

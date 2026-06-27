@@ -53,7 +53,6 @@ const modesRow2 = [
   { id: 'haiku',        label: '🌸 Haiku' },
   { id: 'instrumental', label: '🎹 Instrumental' },
 ];
-const modes = [...modesRow1, ...modesRow2];
 
 const isMobile = () => window.innerWidth < 768;
 
@@ -79,7 +78,6 @@ export default function App() {
 
   // Instrumental state
   const [instrInstruments, setInstrInstruments] = useState([]);
-  const [instrLength, setInstrLength]           = useState('2:00');
   const [instrSections, setInstrSections]       = useState([
     { label: 'Intro', style: 'Ambient' },
     { label: 'Verse 1', style: 'Electronic' },

@@ -44,13 +44,16 @@ const lengthOptions = [
   '1:00', '1:30', '2:00', '2:30', '3:00', '3:30',
 ];
 
-const modes = [
-  { id: 'topic',        label: '💡 Song topic' },
-  { id: 'own',          label: '✏️ My own lyrics' },
+const modesRow1 = [
+  { id: 'topic', label: '💡 Song topic' },
+  { id: 'own',   label: '✏️ My own lyrics' },
+];
+const modesRow2 = [
   { id: 'poem',         label: '📜 Poem' },
   { id: 'haiku',        label: '🌸 Haiku' },
   { id: 'instrumental', label: '🎹 Instrumental' },
 ];
+const modes = [...modesRow1, ...modesRow2];
 
 const isMobile = () => window.innerWidth < 768;
 
@@ -471,20 +474,16 @@ export default function App() {
         {/* Mode selector */}
         <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem' }}>
           <label style={S.label}>What do you want to create?</label>
-          <div style={S.btnWrap}>
-            {modes.map(m => (
+          <div style={{ ...S.btnWrap, marginBottom: '0.6rem' }}>
+            {modesRow1.map(m => (
               <button key={m.id} onClick={() => { setMode(m.id); setPrompt(''); setStep('idle'); setMusic(null); }}
                 style={S.modeBtn(mode === m.id)}>{m.label}</button>
             ))}
           </div>
-        </div>
-
-        {/* Length picker — shown for all modes */}
-        <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem' }}>
-          <label style={S.label}>Song Length</label>
           <div style={S.btnWrap}>
-            {lengthOptions.map(l => (
-              <button key={l} onClick={() => setSongLength(l)} style={S.lengthBtn(songLength === l)}>{l}</button>
+            {modesRow2.map(m => (
+              <button key={m.id} onClick={() => { setMode(m.id); setPrompt(''); setStep('idle'); setMusic(null); }}
+                style={S.modeBtn(mode === m.id)}>{m.label}</button>
             ))}
           </div>
         </div>
@@ -492,12 +491,12 @@ export default function App() {
         {/* ─── INSTRUMENTAL MODE ─────────────────────────────────────────── */}
         {isInstrumental ? (
           <>
-            {/* Length */}
+            {/* Track Length */}
             <div style={S.instrCard}>
               <label style={S.label}>Track Length</label>
               <div style={S.btnWrap}>
                 {lengthOptions.map(l => (
-                  <button key={l} onClick={() => setInstrLength(l)} style={S.lengthBtn(instrLength === l)}>{l}</button>
+                  <button key={l} onClick={() => setSongLength(l)} style={S.lengthBtn(songLength === l)}>{l}</button>
                 ))}
               </div>
             </div>
@@ -605,6 +604,16 @@ export default function App() {
                     [Chorus: electronic, both worlds colliding]<br/>
                     [Bridge: trap beat, the breaking point]
                   </span>
+                </div>
+              )}
+              {(mode === 'topic' || mode === 'own') && (
+                <div style={{ marginTop: '1rem' }}>
+                  <label style={{ ...S.label, fontSize: '0.78rem' }}>Track Length</label>
+                  <div style={S.btnWrap}>
+                    {lengthOptions.map(l => (
+                      <button key={l} onClick={() => setSongLength(l)} style={S.lengthBtn(songLength === l)}>{l}</button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
